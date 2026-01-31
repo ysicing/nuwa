@@ -127,12 +127,26 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - uses: actions/setup-go@v5
-        with:
-          go-version: ${{ env.GO_VERSION }}
-
       - name: Create Kind cluster
         uses: helm/kind-action@v1
 
+      - name: Install OpenKruise
+        run: |
+          helm repo add openkruise https://openkruise.github.io/charts/
+          helm install kruise openkruise/kruise --version 1.8.0 \
+            --set daemon.socketLocation=/run/containerd/containerd.sock \
+            --wait
+
+      - name: Deploy Nuwa
+        run: |
+          make build-installer IMG=${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ github.sha }}
+          kubectl apply -f dist/install.yaml
+          kubectl -n nuwa-system wait --for=condition=available deployment/nuwa-controller-manager --timeout=120s
+
       - name: Run E2E tests
-        run: make test-e2e
+        run: |
+          kubectl apply -f config/samples/app_v1_nuwa.yaml
+          sleep 10
+          kubectl get nuwa
+          kubectl get cloneset
+          kubectl get svc
