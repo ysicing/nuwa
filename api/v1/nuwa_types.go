@@ -144,6 +144,10 @@ type StorageSpec struct {
 
 // NuwaStatus defines the observed state of Nuwa
 type NuwaStatus struct {
+	// ObservedGeneration is the most recent generation observed
+	// +optional
+	ObservedGeneration int64 `json:"observedGeneration,omitempty"`
+
 	// Replicas is the current number of replicas
 	Replicas int32 `json:"replicas,omitempty"`
 
@@ -153,9 +157,24 @@ type NuwaStatus struct {
 	// AvailableReplicas is the number of available replicas
 	AvailableReplicas int32 `json:"availableReplicas,omitempty"`
 
+	// UpdatedReplicas is the number of pods with the updated template
+	UpdatedReplicas int32 `json:"updatedReplicas,omitempty"`
+
 	// Phase represents the current phase of the Nuwa resource
 	// +optional
 	Phase NuwaPhase `json:"phase,omitempty"`
+
+	// ServiceIP is the ClusterIP of the service
+	// +optional
+	ServiceIP string `json:"serviceIP,omitempty"`
+
+	// LoadBalancerIP is the external IP for LoadBalancer type service
+	// +optional
+	LoadBalancerIP string `json:"loadBalancerIP,omitempty"`
+
+	// PVCStatus indicates the status of the PVC if storage type is PVC
+	// +optional
+	PVCStatus string `json:"pvcStatus,omitempty"`
 
 	// Conditions represent the current state of the Nuwa resource
 	// +listType=map
@@ -172,6 +191,18 @@ const (
 	NuwaPhasePending NuwaPhase = "Pending"
 	NuwaPhaseRunning NuwaPhase = "Running"
 	NuwaPhaseFailed  NuwaPhase = "Failed"
+)
+
+// Condition types for Nuwa
+const (
+	// ConditionCloneSetReady indicates whether the CloneSet is ready
+	ConditionCloneSetReady = "CloneSetReady"
+	// ConditionServiceReady indicates whether the Service is ready
+	ConditionServiceReady = "ServiceReady"
+	// ConditionPVCReady indicates whether the PVC is ready (only when storage type is PVC)
+	ConditionPVCReady = "PVCReady"
+	// ConditionProgressing indicates whether the resource is progressing
+	ConditionProgressing = "Progressing"
 )
 
 // +kubebuilder:object:root=true

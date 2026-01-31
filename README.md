@@ -28,7 +28,20 @@ helm install kruise openkruise/kruise --version 1.8.0
 
 ### 安装 Nuwa
 
+**方式一：YAML 快速安装（推荐）**
+
 ```bash
+# 一键安装
+kubectl apply -f https://raw.githubusercontent.com/ysicing/nuwa/master/dist/install.yaml
+```
+
+**方式二：源码安装**
+
+```bash
+# 克隆仓库
+git clone https://github.com/ysicing/nuwa.git
+cd nuwa
+
 # 安装 CRD
 make install
 
@@ -163,7 +176,31 @@ kubectl get nuwa
 # 输出示例
 NAME       IMAGE          REPLICAS   READY   PHASE     AGE
 my-app     nginx:latest   2          2       Running   5m
+
+# 查看详细状态
+kubectl get nuwa my-app -o yaml
 ```
+
+**状态字段说明：**
+
+| 字段 | 说明 |
+|------|------|
+| `replicas` | 当前副本数 |
+| `readyReplicas` | 就绪副本数 |
+| `updatedReplicas` | 已更新副本数 |
+| `phase` | 运行阶段（Pending/Running/Failed） |
+| `serviceIP` | Service ClusterIP |
+| `loadBalancerIP` | LoadBalancer 外部 IP |
+| `pvcStatus` | PVC 状态（Bound/Pending，仅 PVC 存储类型） |
+
+**Conditions：**
+
+| Condition | 说明 |
+|-----------|------|
+| `CloneSetReady` | CloneSet 是否就绪 |
+| `ServiceReady` | Service 是否创建成功 |
+| `PVCReady` | PVC 是否绑定成功 |
+| `Progressing` | 是否正在滚动更新 |
 
 ## 卸载
 
@@ -171,10 +208,11 @@ my-app     nginx:latest   2          2       Running   5m
 # 删除应用
 kubectl delete nuwa my-app
 
-# 卸载控制器
-make undeploy
+# 卸载 Nuwa（YAML 安装方式）
+kubectl delete -f https://raw.githubusercontent.com/ysicing/nuwa/master/dist/install.yaml
 
-# 删除 CRD
+# 卸载 Nuwa（源码安装方式）
+make undeploy
 make uninstall
 ```
 

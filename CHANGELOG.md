@@ -32,3 +32,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - E2E 测试（Kind 集群）
 - Taskfile 快捷命令封装
 - 中文 README 文档
+- build-installer workflow，自动生成 install.yaml 并创建 PR
+- NuwaStatus 增强字段
+  - `observedGeneration`：已处理的 spec 版本
+  - `updatedReplicas`：已更新的副本数
+  - `serviceIP`：Service ClusterIP
+  - `loadBalancerIP`：LoadBalancer 外部 IP
+  - `pvcStatus`：PVC 状态（Bound/Pending/NotFound）
+- Conditions 支持
+  - `CloneSetReady`：CloneSet 是否就绪
+  - `ServiceReady`：Service 是否创建成功
+  - `PVCReady`：PVC 是否绑定成功
+  - `Progressing`：是否正在滚动更新
+
+### Changed
+- CI 添加 `latest` tag 支持，push 到 master 时自动生成
+- README 添加 YAML 快速安装方式（`kubectl apply -f dist/install.yaml`）
+- README 添加状态字段和 Conditions 说明
+
+### Fixed
+- 修复 `containerPorts` 和 `servicePorts` 切片 prealloc lint 警告
