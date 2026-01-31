@@ -58,7 +58,7 @@ jobs:
   docker:
     name: Docker
     runs-on: ubuntu-latest
-    needs: [lint, test]
+    needs: [build]
     if: github.event_name == 'push'
     permissions:
       contents: read
@@ -105,8 +105,8 @@ jobs:
   e2e:
     name: E2E Test
     runs-on: ubuntu-latest
-    needs: [build]
-    if: github.event_name == 'pull_request'
+    needs: [docker]
+    if: github.event_name == 'push'
     steps:
       - uses: actions/checkout@v4
 
@@ -114,11 +114,8 @@ jobs:
         with:
           go-version: ${{ env.GO_VERSION }}
 
-      - name: Install kind
-        run: |
-          curl -Lo ./kind https://kind.sigs.k8s.io/dl/latest/kind-linux-amd64
-          chmod +x ./kind
-          sudo mv ./kind /usr/local/bin/kind
+      - name: Create Kind cluster
+        uses: helm/kind-action@v1
 
       - name: Run E2E tests
         run: make test-e2e

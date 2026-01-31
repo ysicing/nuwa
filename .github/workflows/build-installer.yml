@@ -33,19 +33,7 @@ jobs:
       - name: Build installer manifest
         run: make build-installer IMG=ghcr.io/ysicing/nuwa:latest
 
-      - name: Check for changes
-        id: changes
-        run: |
-          if [ ! -f dist/install.yaml ]; then
-            echo "changed=true" >> $GITHUB_OUTPUT
-          elif git diff --quiet dist/install.yaml; then
-            echo "changed=false" >> $GITHUB_OUTPUT
-          else
-            echo "changed=true" >> $GITHUB_OUTPUT
-          fi
-
       - name: Create Pull Request
-        if: steps.changes.outputs.changed == 'true'
         uses: peter-evans/create-pull-request@v7
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
@@ -58,3 +46,4 @@ jobs:
           branch: chore/update-install-yaml
           delete-branch: true
           labels: automated
+          add-paths: dist/install.yaml

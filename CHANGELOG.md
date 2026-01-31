@@ -44,11 +44,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - `ServiceReady`：Service 是否创建成功
   - `PVCReady`：PVC 是否绑定成功
   - `Progressing`：是否正在滚动更新
+- Dependabot 自动合并 workflow（botmerge）
 
 ### Changed
 - CI 添加 `latest` tag 支持，push 到 master 时自动生成
 - README 添加 YAML 快速安装方式（`kubectl apply -f dist/install.yaml`）
 - README 添加状态字段和 Conditions 说明
+- CI 执行顺序优化：lint/test → build → docker → e2e
+- E2E 测试使用 `helm/kind-action` 简化 Kind 集群创建
+- build-installer workflow 简化 PR 创建逻辑
 
 ### Fixed
 - 修复 `containerPorts` 和 `servicePorts` 切片 prealloc lint 警告
