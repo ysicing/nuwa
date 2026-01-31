@@ -353,14 +353,38 @@ spec:
                       More info: https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/
                     type: object
                 type: object
-              serviceType:
-                default: ClusterIP
-                description: ServiceType defines the type of Service to create
-                enum:
-                - ClusterIP
-                - NodePort
-                - LoadBalancer
-                type: string
+              service:
+                description: Service defines the Service configuration
+                properties:
+                  annotations:
+                    additionalProperties:
+                      type: string
+                    description: Annotations are the annotations to add to the Service
+                    type: object
+                  externalTrafficPolicy:
+                    description: ExternalTrafficPolicy specifies the external traffic
+                      policy
+                    enum:
+                    - Cluster
+                    - Local
+                    type: string
+                  loadBalancerClass:
+                    description: LoadBalancerClass is the class of the load balancer
+                      implementation
+                    type: string
+                  loadBalancerIP:
+                    description: LoadBalancerIP is the IP to assign to the LoadBalancer
+                      (if supported)
+                    type: string
+                  type:
+                    default: ClusterIP
+                    description: 'Type is the Service type: ClusterIP, NodePort, LoadBalancer'
+                    enum:
+                    - ClusterIP
+                    - NodePort
+                    - LoadBalancer
+                    type: string
+                type: object
               storage:
                 description: Storage defines persistent volume configuration
                 properties:
