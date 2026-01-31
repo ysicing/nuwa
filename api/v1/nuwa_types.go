@@ -66,11 +66,9 @@ type NuwaSpec struct {
 	// +optional
 	ImagePullSecrets []corev1.LocalObjectReference `json:"imagePullSecrets,omitempty"`
 
-	// ServiceType defines the type of Service to create
-	// +kubebuilder:default=ClusterIP
-	// +kubebuilder:validation:Enum=ClusterIP;NodePort;LoadBalancer
+	// Service defines the Service configuration
 	// +optional
-	ServiceType corev1.ServiceType `json:"serviceType,omitempty"`
+	Service *ServiceSpec `json:"service,omitempty"`
 }
 
 // PortMapping defines a port mapping for the container and service
@@ -97,6 +95,32 @@ type PortMapping struct {
 	// NodePort is the port on each node (only for NodePort/LoadBalancer)
 	// +optional
 	NodePort int32 `json:"nodePort,omitempty"`
+}
+
+// ServiceSpec defines the Service configuration
+type ServiceSpec struct {
+	// Type is the Service type: ClusterIP, NodePort, LoadBalancer
+	// +kubebuilder:default=ClusterIP
+	// +kubebuilder:validation:Enum=ClusterIP;NodePort;LoadBalancer
+	// +optional
+	Type corev1.ServiceType `json:"type,omitempty"`
+
+	// Annotations are the annotations to add to the Service
+	// +optional
+	Annotations map[string]string `json:"annotations,omitempty"`
+
+	// LoadBalancerClass is the class of the load balancer implementation
+	// +optional
+	LoadBalancerClass *string `json:"loadBalancerClass,omitempty"`
+
+	// LoadBalancerIP is the IP to assign to the LoadBalancer (if supported)
+	// +optional
+	LoadBalancerIP string `json:"loadBalancerIP,omitempty"`
+
+	// ExternalTrafficPolicy specifies the external traffic policy
+	// +kubebuilder:validation:Enum=Cluster;Local
+	// +optional
+	ExternalTrafficPolicy corev1.ServiceExternalTrafficPolicy `json:"externalTrafficPolicy,omitempty"`
 }
 
 // StorageType defines the type of storage

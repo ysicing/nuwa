@@ -339,23 +339,46 @@ func (r *NuwaReconciler) buildService(nuwa *appv1.Nuwa) *corev1.Service {
 		servicePorts = append(servicePorts, sp)
 	}
 
-	serviceType := nuwa.Spec.ServiceType
-	if serviceType == "" {
-		serviceType = corev1.ServiceTypeClusterIP
+	// Get service configuration
+	serviceType := corev1.ServiceTypeClusterIP
+	var annotations map[string]string
+	var loadBalancerClass *string
+	var loadBalancerIP string
+	var externalTrafficPolicy corev1.ServiceExternalTrafficPolicy
+
+	if nuwa.Spec.Service != nil {
+		if nuwa.Spec.Service.Type != "" {
+			serviceType = nuwa.Spec.Service.Type
+		}
+		annotations = nuwa.Spec.Service.Annotations
+		loadBalancerClass = nuwa.Spec.Service.LoadBalancerClass
+		loadBalancerIP = nuwa.Spec.Service.LoadBalancerIP
+		externalTrafficPolicy = nuwa.Spec.Service.ExternalTrafficPolicy
 	}
 
-	return &corev1.Service{
+	svc := &corev1.Service{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      nuwa.Name,
-			Namespace: nuwa.Namespace,
-			Labels:    labels,
+			Name:        nuwa.Name,
+			Namespace:   nuwa.Namespace,
+			Labels:      labels,
+			Annotations: annotations,
 		},
 		Spec: corev1.ServiceSpec{
-			Type:     serviceType,
-			Selector: labels,
-			Ports:    servicePorts,
+			Type:              serviceType,
+			Selector:          labels,
+			Ports:             servicePorts,
+			LoadBalancerClass: loadBalancerClass,
 		},
 	}
+
+	if loadBalancerIP != "" {
+		svc.Spec.LoadBalancerIP = loadBalancerIP
+	}
+	if externalTrafficPolicy != "" {
+		svc.Spec.ExternalTrafficPolicy = externalTrafficPolicy
+	}
+
+	return svc
 }
 
 func (r *NuwaReconciler) updateStatus(ctx context.Context, nuwa *appv1.Nuwa) error {

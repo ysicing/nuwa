@@ -104,8 +104,13 @@ spec:
     - name: metrics
       containerPort: 9090
 
-  # Service 类型：ClusterIP（默认）、NodePort、LoadBalancer
-  serviceType: ClusterIP
+  # Service 配置
+  service:
+    type: ClusterIP              # ClusterIP（默认）、NodePort、LoadBalancer
+    annotations:                 # Service 注解
+      service.beta.kubernetes.io/aws-load-balancer-type: nlb
+    loadBalancerClass: service.k8s.aws/nlb  # LoadBalancer 类型时使用
+    externalTrafficPolicy: Local # 外部流量策略
 
   # 资源限制
   resources:
