@@ -1,0 +1,151 @@
+{
+  "version": "1.0.0",
+  "timestamp": "2026-01-31T22:17:51+0800",
+  "project": {
+    "name": "nuwa",
+    "description": "Kubernetes CRD controller for simplified application deployment",
+    "domain": "app.12306.work",
+    "language": "Go",
+    "framework": "kubebuilder",
+    "goVersion": "1.25.3"
+  },
+  "modules": [
+    {
+      "name": "api/v1",
+      "path": "api/v1",
+      "description": "CRD schema definitions (NuwaSpec, NuwaStatus, PortMapping, StorageSpec)",
+      "language": "Go",
+      "entryFile": "nuwa_types.go",
+      "hasTests": false,
+      "hasConfig": false,
+      "claudeMd": "api/v1/CLAUDE.md",
+      "files": [
+        "api/v1/nuwa_types.go",
+        "api/v1/groupversion_info.go",
+        "api/v1/zz_generated.deepcopy.go"
+      ]
+    },
+    {
+      "name": "internal/controller",
+      "path": "internal/controller",
+      "description": "Nuwa reconciler - creates CloneSet and Service from Nuwa CR",
+      "language": "Go",
+      "entryFile": "nuwa_controller.go",
+      "hasTests": true,
+      "hasConfig": false,
+      "claudeMd": "internal/controller/CLAUDE.md",
+      "files": [
+        "internal/controller/nuwa_controller.go",
+        "internal/controller/nuwa_controller_test.go",
+        "internal/controller/suite_test.go"
+      ]
+    },
+    {
+      "name": "cmd",
+      "path": "cmd",
+      "description": "Manager entry point and bootstrap",
+      "language": "Go",
+      "entryFile": "main.go",
+      "hasTests": false,
+      "hasConfig": false,
+      "claudeMd": null,
+      "files": [
+        "cmd/main.go"
+      ]
+    },
+    {
+      "name": "config",
+      "path": "config",
+      "description": "Kubernetes manifests (CRD, RBAC, Manager deployment)",
+      "language": "YAML",
+      "entryFile": null,
+      "hasTests": false,
+      "hasConfig": true,
+      "claudeMd": null,
+      "submodules": [
+        {
+          "name": "crd",
+          "path": "config/crd",
+          "description": "CustomResourceDefinition manifests"
+        },
+        {
+          "name": "rbac",
+          "path": "config/rbac",
+          "description": "RBAC rules (Role, RoleBinding, ServiceAccount)"
+        },
+        {
+          "name": "manager",
+          "path": "config/manager",
+          "description": "Controller Deployment manifest"
+        },
+        {
+          "name": "samples",
+          "path": "config/samples",
+          "description": "Example Nuwa CR"
+        }
+      ]
+    },
+    {
+      "name": "test",
+      "path": "test",
+      "description": "E2E tests and test utilities",
+      "language": "Go",
+      "entryFile": null,
+      "hasTests": true,
+      "hasConfig": false,
+      "claudeMd": null,
+      "files": [
+        "test/e2e/e2e_test.go",
+        "test/e2e/e2e_suite_test.go",
+        "test/utils/utils.go"
+      ]
+    },
+    {
+      "name": "hack/charts",
+      "path": "hack/charts",
+      "description": "Helm chart for deployment",
+      "language": "YAML",
+      "entryFile": "Chart.yaml",
+      "hasTests": false,
+      "hasConfig": true,
+      "claudeMd": null
+    }
+  ],
+  "coverage": {
+    "totalFiles": 46,
+    "scannedFiles": 46,
+    "coveragePercent": 100,
+    "goFiles": 10,
+    "yamlFiles": 36,
+    "testFiles": 4
+  },
+  "dependencies": {
+    "runtime": [
+      "sigs.k8s.io/controller-runtime@v0.23.1",
+      "github.com/openkruise/kruise-api@v1.8.0",
+      "k8s.io/apimachinery@v0.35.0",
+      "k8s.io/client-go@v0.35.0"
+    ],
+    "testing": [
+      "github.com/onsi/ginkgo/v2@v2.27.2",
+      "github.com/onsi/gomega@v1.38.2"
+    ]
+  },
+  "qualityTools": {
+    "linter": "golangci-lint",
+    "linterConfig": ".golangci.yml",
+    "enabledLinters": [
+      "errcheck",
+      "govet",
+      "staticcheck",
+      "revive",
+      "gocyclo",
+      "dupl",
+      "misspell",
+      "unused"
+    ]
+  },
+  "gaps": [],
+  "truncated": false,
+  "nextSteps": []
+}

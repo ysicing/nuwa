@@ -1,0 +1,61 @@
+version: '3'
+
+vars:
+  IMG: '{{.IMG | default "ghcr.io/ysicing/nuwa:latest"}}'
+
+tasks:
+  default:
+    desc: 构建项目
+    cmds:
+      - make build
+
+  build:
+    desc: 编译二进制
+    cmds:
+      - make build
+
+  run:
+    desc: 本地运行控制器
+    cmds:
+      - make run
+
+  test:
+    desc: 运行单元测试
+    cmds:
+      - make test
+
+  lint:
+    desc: 代码检查
+    cmds:
+      - make lint
+
+  install:
+    desc: 安装 CRD 到集群
+    cmds:
+      - make install
+
+  uninstall:
+    desc: 从集群卸载 CRD
+    cmds:
+      - make uninstall
+
+  deploy:
+    desc: 部署控制器到集群
+    cmds:
+      - make deploy IMG={{.IMG}}
+
+  undeploy:
+    desc: 从集群卸载控制器
+    cmds:
+      - make undeploy
+
+  docker:
+    desc: 构建并推送 Docker 镜像
+    cmds:
+      - make docker-build IMG={{.IMG}}
+      - make docker-push IMG={{.IMG}}
+
+  clean:
+    desc: 清理构建产物
+    cmds:
+      - rm -rf bin/ dist/ cover.out
