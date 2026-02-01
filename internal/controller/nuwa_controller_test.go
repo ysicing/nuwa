@@ -22,6 +22,7 @@ import (
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	kruiseappsv1alpha1 "github.com/openkruise/kruise-api/apps/v1alpha1"
+	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/apimachinery/pkg/types"
@@ -319,5 +320,202 @@ var _ = Describe("resourcePtr", func() {
 		ptr := resourcePtr(q)
 		Expect(ptr).NotTo(BeNil())
 		Expect(ptr.String()).To(Equal("1Gi"))
+	})
+})
+
+var _ = Describe("getRetainPolicy", func() {
+	It("should return Retain when storage is nil", func() {
+		policy := getRetainPolicy(nil)
+		Expect(policy).To(Equal(appv1.PVCRetainPolicyRetain))
+	})
+
+	It("should return Retain when retainPolicy is empty", func() {
+		storage := &appv1.StorageSpec{}
+		policy := getRetainPolicy(storage)
+		Expect(policy).To(Equal(appv1.PVCRetainPolicyRetain))
+	})
+
+	It("should return Retain when explicitly set to Retain", func() {
+		storage := &appv1.StorageSpec{
+			RetainPolicy: appv1.PVCRetainPolicyRetain,
+		}
+		policy := getRetainPolicy(storage)
+		Expect(policy).To(Equal(appv1.PVCRetainPolicyRetain))
+	})
+
+	It("should return Delete when explicitly set to Delete", func() {
+		storage := &appv1.StorageSpec{
+			RetainPolicy: appv1.PVCRetainPolicyDelete,
+		}
+		policy := getRetainPolicy(storage)
+		Expect(policy).To(Equal(appv1.PVCRetainPolicyDelete))
+	})
+})
+
+var _ = Describe("hasNuwaOwnerReference", func() {
+	var pvc *corev1.PersistentVolumeClaim
+	var nuwa *appv1.Nuwa
+
+	BeforeEach(func() {
+		pvc = &corev1.PersistentVolumeClaim{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "test-pvc",
+				Namespace: "default",
+			},
+		}
+		nuwa = &appv1.Nuwa{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "test-nuwa",
+				Namespace: "default",
+			},
+		}
+	})
+
+	It("should return false when PVC has no owner references", func() {
+		result := hasNuwaOwnerReference(pvc, nuwa)
+		Expect(result).To(BeFalse())
+	})
+
+	It("should return false when PVC has different owner reference", func() {
+		pvc.OwnerReferences = []metav1.OwnerReference{
+			{
+				Kind: "Deployment",
+				Name: "other-owner",
+			},
+		}
+		result := hasNuwaOwnerReference(pvc, nuwa)
+		Expect(result).To(BeFalse())
+	})
+
+	It("should return false when PVC has Nuwa owner with different name", func() {
+		pvc.OwnerReferences = []metav1.OwnerReference{
+			{
+				Kind: "Nuwa",
+				Name: "different-nuwa",
+			},
+		}
+		result := hasNuwaOwnerReference(pvc, nuwa)
+		Expect(result).To(BeFalse())
+	})
+
+	It("should return true when PVC has matching Nuwa owner reference", func() {
+		pvc.OwnerReferences = []metav1.OwnerReference{
+			{
+				Kind: "Nuwa",
+				Name: "test-nuwa",
+			},
+		}
+		result := hasNuwaOwnerReference(pvc, nuwa)
+		Expect(result).To(BeTrue())
+	})
+
+	It("should return true when PVC has multiple owner references including Nuwa", func() {
+		pvc.OwnerReferences = []metav1.OwnerReference{
+			{
+				Kind: "Deployment",
+				Name: "other-owner",
+			},
+			{
+				Kind: "Nuwa",
+				Name: "test-nuwa",
+			},
+		}
+		result := hasNuwaOwnerReference(pvc, nuwa)
+		Expect(result).To(BeTrue())
+	})
+})
+
+var _ = Describe("removeNuwaOwnerReference", func() {
+	var pvc *corev1.PersistentVolumeClaim
+	var nuwa *appv1.Nuwa
+
+	BeforeEach(func() {
+		pvc = &corev1.PersistentVolumeClaim{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "test-pvc",
+				Namespace: "default",
+			},
+		}
+		nuwa = &appv1.Nuwa{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "test-nuwa",
+				Namespace: "default",
+			},
+		}
+	})
+
+	It("should do nothing when PVC has no owner references", func() {
+		removeNuwaOwnerReference(pvc, nuwa)
+		Expect(pvc.OwnerReferences).To(BeNil())
+	})
+
+	It("should remove Nuwa owner reference", func() {
+		pvc.OwnerReferences = []metav1.OwnerReference{
+			{
+				Kind: "Nuwa",
+				Name: "test-nuwa",
+			},
+		}
+		removeNuwaOwnerReference(pvc, nuwa)
+		Expect(pvc.OwnerReferences).To(BeEmpty())
+	})
+
+	It("should preserve other owner references", func() {
+		pvc.OwnerReferences = []metav1.OwnerReference{
+			{
+				Kind: "Deployment",
+				Name: "other-owner",
+			},
+			{
+				Kind: "Nuwa",
+				Name: "test-nuwa",
+			},
+			{
+				Kind: "StatefulSet",
+				Name: "another-owner",
+			},
+		}
+		removeNuwaOwnerReference(pvc, nuwa)
+		Expect(pvc.OwnerReferences).To(HaveLen(2))
+		Expect(pvc.OwnerReferences[0].Kind).To(Equal("Deployment"))
+		Expect(pvc.OwnerReferences[1].Kind).To(Equal("StatefulSet"))
+	})
+
+	It("should not remove Nuwa owner reference with different name", func() {
+		pvc.OwnerReferences = []metav1.OwnerReference{
+			{
+				Kind: "Nuwa",
+				Name: "different-nuwa",
+			},
+		}
+		removeNuwaOwnerReference(pvc, nuwa)
+		Expect(pvc.OwnerReferences).To(HaveLen(1))
+		Expect(pvc.OwnerReferences[0].Name).To(Equal("different-nuwa"))
+	})
+})
+
+var _ = Describe("getPVCName", func() {
+	It("should return correct PVC name", func() {
+		name := getPVCName("my-app")
+		Expect(name).To(Equal("my-app-data"))
+	})
+
+	It("should handle empty name", func() {
+		name := getPVCName("")
+		Expect(name).To(Equal("-data"))
+	})
+})
+
+var _ = Describe("buildLabels", func() {
+	It("should return correct labels", func() {
+		labels := buildLabels("my-app")
+		Expect(labels).To(HaveKeyWithValue("app.kubernetes.io/name", "my-app"))
+		Expect(labels).To(HaveKeyWithValue("app.kubernetes.io/managed-by", "nuwa"))
+	})
+
+	It("should handle empty name", func() {
+		labels := buildLabels("")
+		Expect(labels).To(HaveKeyWithValue("app.kubernetes.io/name", ""))
+		Expect(labels).To(HaveKeyWithValue("app.kubernetes.io/managed-by", "nuwa"))
 	})
 })

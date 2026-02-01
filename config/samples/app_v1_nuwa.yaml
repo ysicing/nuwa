@@ -47,6 +47,7 @@ spec:
   #   size: 10Gi
   #   mountPath: /data
   #   storageClassName: standard
+  #   retainPolicy: Retain  # Retain (default) or Delete
 
   # EmptyDir example:
   # storage:

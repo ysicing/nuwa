@@ -354,29 +354,80 @@ func (r *NuwaReconciler) reconcileService(ctx context.Context, nuwa *appv1.Nuwa)
 }
 
 func (r *NuwaReconciler) reconcilePVC(ctx context.Context, nuwa *appv1.Nuwa) error {
+	log := logf.FromContext(ctx)
+
 	pvc, err := r.buildPVC(nuwa)
 	if err != nil {
 		return err
 	}
 
-	// Set owner reference
-	if err := controllerutil.SetControllerReference(nuwa, pvc, r.Scheme); err != nil {
-		return err
-	}
+	// Determine retain policy
+	retainPolicy := getRetainPolicy(nuwa.Spec.Storage)
 
 	// Check if PVC exists
 	found := &corev1.PersistentVolumeClaim{}
 	err = r.Get(ctx, types.NamespacedName{Name: pvc.Name, Namespace: pvc.Namespace}, found)
 	if err != nil && errors.IsNotFound(err) {
+		// PVC doesn't exist, set owner reference based on policy before creating
+		if retainPolicy == appv1.PVCRetainPolicyDelete {
+			if err := controllerutil.SetControllerReference(nuwa, pvc, r.Scheme); err != nil {
+				return err
+			}
+		}
 		// Create new PVC
 		return r.Create(ctx, pvc)
 	} else if err != nil {
 		return err
 	}
 
-	// PVC exists, no need to update (PVC spec is immutable except for size)
-	// TODO: Support PVC resize if needed
+	// PVC exists, handle dynamic policy changes (only safe direction: Delete → Retain)
+	hasOwnerRef := hasNuwaOwnerReference(found, nuwa)
+
+	if retainPolicy == appv1.PVCRetainPolicyRetain && hasOwnerRef {
+		// Safe direction: Delete → Retain (remove owner reference to preserve PVC)
+		log.Info("Updating PVC retention policy: Delete → Retain", "pvc", found.Name)
+		removeNuwaOwnerReference(found, nuwa)
+		// Update annotation
+		if found.Annotations == nil {
+			found.Annotations = make(map[string]string)
+		}
+		found.Annotations["nuwa.12306.work/retain-policy"] = string(appv1.PVCRetainPolicyRetain)
+		return r.Update(ctx, found)
+	}
+
+	// Note: Retain → Delete is NOT supported dynamically to prevent accidental data loss
+	// Users must delete and recreate the Nuwa resource to change from Retain to Delete
+
 	return nil
+}
+
+// hasNuwaOwnerReference checks if the PVC has an owner reference to the given Nuwa
+func hasNuwaOwnerReference(pvc *corev1.PersistentVolumeClaim, nuwa *appv1.Nuwa) bool {
+	for _, ref := range pvc.OwnerReferences {
+		if ref.Kind == "Nuwa" && ref.Name == nuwa.Name {
+			return true
+		}
+	}
+	return false
+}
+
+// removeNuwaOwnerReference removes the owner reference to the given Nuwa from the PVC
+func removeNuwaOwnerReference(pvc *corev1.PersistentVolumeClaim, nuwa *appv1.Nuwa) {
+	var newRefs []metav1.OwnerReference
+	for _, ref := range pvc.OwnerReferences {
+		if !(ref.Kind == "Nuwa" && ref.Name == nuwa.Name) {
+			newRefs = append(newRefs, ref)
+		}
+	}
+	pvc.OwnerReferences = newRefs
+}
+
+// getRetainPolicy returns the PVC retain policy, defaulting to Retain if not specified
+func getRetainPolicy(storage *appv1.StorageSpec) appv1.PVCRetainPolicy {
+	if storage == nil || storage.RetainPolicy == "" {
+		return appv1.PVCRetainPolicyRetain
+	}
+	return storage.RetainPolicy
 }
 
 func (r *NuwaReconciler) buildPVC(nuwa *appv1.Nuwa) (*corev1.PersistentVolumeClaim, error) {
@@ -398,11 +449,18 @@ func (r *NuwaReconciler) buildPVC(nuwa *appv1.Nuwa) (*corev1.PersistentVolumeCla
 		return nil, fmt.Errorf("invalid storage size format %q: %w", storageSize, err)
 	}
 
+	// Determine retain policy using helper function
+	retainPolicy := getRetainPolicy(nuwa.Spec.Storage)
+
 	return &corev1.PersistentVolumeClaim{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      getPVCName(nuwa.Name),
 			Namespace: nuwa.Namespace,
 			Labels:    labels,
+			Annotations: map[string]string{
+				"nuwa.12306.work/created-by":    nuwa.Name,
+				"nuwa.12306.work/retain-policy": string(retainPolicy),
+			},
 		},
 		Spec: corev1.PersistentVolumeClaimSpec{
 			AccessModes:      accessModes,
@@ -651,7 +709,7 @@ func (r *NuwaReconciler) SetupWithManager(mgr ctrl.Manager) error {
 		For(&appv1.Nuwa{}).
 		Owns(&kruiseappsv1alpha1.CloneSet{}).
 		Owns(&corev1.Service{}).
-		Owns(&corev1.PersistentVolumeClaim{}).
+		Owns(&corev1.PersistentVolumeClaim{}). // PVC ownership depends on retainPolicy
 		Named("nuwa").
 		Complete(r)
 }

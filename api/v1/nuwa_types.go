@@ -228,6 +228,17 @@ const (
 	StorageTypeHostPath StorageType = "HostPath"
 )
 
+// PVCRetainPolicy defines the PVC retention policy when Nuwa is deleted
+// +kubebuilder:validation:Enum=Retain;Delete
+type PVCRetainPolicy string
+
+const (
+	// PVCRetainPolicyRetain - PVC is retained when Nuwa is deleted (default)
+	PVCRetainPolicyRetain PVCRetainPolicy = "Retain"
+	// PVCRetainPolicyDelete - PVC is deleted when Nuwa is deleted
+	PVCRetainPolicyDelete PVCRetainPolicy = "Delete"
+)
+
 // StorageSpec defines storage configuration
 type StorageSpec struct {
 	// Type is the storage type: PVC, EmptyDir, HostPath
@@ -251,6 +262,11 @@ type StorageSpec struct {
 	// +kubebuilder:default={ReadWriteOnce}
 	// +optional
 	AccessModes []corev1.PersistentVolumeAccessMode `json:"accessModes,omitempty"`
+
+	// RetainPolicy defines whether PVC should be retained when Nuwa is deleted (only for PVC)
+	// +kubebuilder:default=Retain
+	// +optional
+	RetainPolicy PVCRetainPolicy `json:"retainPolicy,omitempty"`
 
 	// HostPath is the path on the host (only for HostPath type)
 	// +optional
