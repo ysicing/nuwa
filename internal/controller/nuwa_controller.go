@@ -491,109 +491,115 @@ func (r *NuwaReconciler) buildService(nuwa *appv1.Nuwa) *corev1.Service {
 func (r *NuwaReconciler) updateStatus(ctx context.Context, nuwa *appv1.Nuwa) error {
 	log := logf.FromContext(ctx)
 
+	// Refetch the latest Nuwa resource to avoid conflicts
+	latest := &appv1.Nuwa{}
+	if err := r.Get(ctx, types.NamespacedName{Name: nuwa.Name, Namespace: nuwa.Namespace}, latest); err != nil {
+		return err
+	}
+
 	// Update observed generation
-	nuwa.Status.ObservedGeneration = nuwa.Generation
+	latest.Status.ObservedGeneration = latest.Generation
 
 	// Get CloneSet status
 	cloneSet := &kruiseappsv1alpha1.CloneSet{}
-	cloneSetErr := r.Get(ctx, types.NamespacedName{Name: nuwa.Name, Namespace: nuwa.Namespace}, cloneSet)
+	cloneSetErr := r.Get(ctx, types.NamespacedName{Name: latest.Name, Namespace: latest.Namespace}, cloneSet)
 	if cloneSetErr != nil && !errors.IsNotFound(cloneSetErr) {
 		return cloneSetErr
 	}
 
 	if cloneSetErr == nil {
 		// Update Nuwa status from CloneSet
-		nuwa.Status.Replicas = cloneSet.Status.Replicas
-		nuwa.Status.ReadyReplicas = cloneSet.Status.ReadyReplicas
-		nuwa.Status.AvailableReplicas = cloneSet.Status.AvailableReplicas
-		nuwa.Status.UpdatedReplicas = cloneSet.Status.UpdatedReplicas
+		latest.Status.Replicas = cloneSet.Status.Replicas
+		latest.Status.ReadyReplicas = cloneSet.Status.ReadyReplicas
+		latest.Status.AvailableReplicas = cloneSet.Status.AvailableReplicas
+		latest.Status.UpdatedReplicas = cloneSet.Status.UpdatedReplicas
 
 		// Set CloneSetReady condition
 		cloneSetReady := cloneSet.Status.ReadyReplicas == cloneSet.Status.Replicas && cloneSet.Status.Replicas > 0
-		setCondition(nuwa, appv1.ConditionCloneSetReady, cloneSetReady,
+		setCondition(latest, appv1.ConditionCloneSetReady, cloneSetReady,
 			"CloneSetReady", "CloneSet is ready",
 			"CloneSetNotReady", fmt.Sprintf("CloneSet has %d/%d ready replicas", cloneSet.Status.ReadyReplicas, cloneSet.Status.Replicas))
 
 		// Set Progressing condition
 		progressing := cloneSet.Status.UpdatedReplicas != cloneSet.Status.Replicas
-		setCondition(nuwa, appv1.ConditionProgressing, progressing,
+		setCondition(latest, appv1.ConditionProgressing, progressing,
 			"Progressing", fmt.Sprintf("Rolling update in progress: %d/%d updated", cloneSet.Status.UpdatedReplicas, cloneSet.Status.Replicas),
 			"NotProgressing", "All replicas are up to date")
 	}
 
 	// Get Service status
 	service := &corev1.Service{}
-	serviceErr := r.Get(ctx, types.NamespacedName{Name: nuwa.Name, Namespace: nuwa.Namespace}, service)
+	serviceErr := r.Get(ctx, types.NamespacedName{Name: latest.Name, Namespace: latest.Namespace}, service)
 	if serviceErr != nil && !errors.IsNotFound(serviceErr) {
 		log.Error(serviceErr, "Failed to get Service")
 	}
 
 	if serviceErr == nil {
-		nuwa.Status.ServiceIP = service.Spec.ClusterIP
+		latest.Status.ServiceIP = service.Spec.ClusterIP
 
 		// Get LoadBalancer IP if applicable
 		if service.Spec.Type == corev1.ServiceTypeLoadBalancer && len(service.Status.LoadBalancer.Ingress) > 0 {
 			ingress := service.Status.LoadBalancer.Ingress[0]
 			if ingress.IP != "" {
-				nuwa.Status.LoadBalancerIP = ingress.IP
+				latest.Status.LoadBalancerIP = ingress.IP
 			} else if ingress.Hostname != "" {
-				nuwa.Status.LoadBalancerIP = ingress.Hostname
+				latest.Status.LoadBalancerIP = ingress.Hostname
 			}
 		}
 
 		// Set ServiceReady condition
-		setCondition(nuwa, appv1.ConditionServiceReady, true,
+		setCondition(latest, appv1.ConditionServiceReady, true,
 			"ServiceReady", "Service is ready",
 			"", "")
 	} else if errors.IsNotFound(serviceErr) {
-		nuwa.Status.ServiceIP = ""
-		nuwa.Status.LoadBalancerIP = ""
-		setCondition(nuwa, appv1.ConditionServiceReady, false,
+		latest.Status.ServiceIP = ""
+		latest.Status.LoadBalancerIP = ""
+		setCondition(latest, appv1.ConditionServiceReady, false,
 			"", "",
 			"ServiceNotFound", "Service not found")
 	}
 
 	// Get PVC status if storage type is PVC
-	if nuwa.Spec.Storage != nil && nuwa.Spec.Storage.Type == appv1.StorageTypePVC {
+	if latest.Spec.Storage != nil && latest.Spec.Storage.Type == appv1.StorageTypePVC {
 		// Get single PVC created by reconcilePVC
-		pvcName := getPVCName(nuwa.Name)
+		pvcName := getPVCName(latest.Name)
 		pvc := &corev1.PersistentVolumeClaim{}
-		pvcErr := r.Get(ctx, types.NamespacedName{Name: pvcName, Namespace: nuwa.Namespace}, pvc)
+		pvcErr := r.Get(ctx, types.NamespacedName{Name: pvcName, Namespace: latest.Namespace}, pvc)
 
 		if pvcErr == nil {
-			nuwa.Status.PVCStatus = string(pvc.Status.Phase)
+			latest.Status.PVCStatus = string(pvc.Status.Phase)
 			pvcBound := pvc.Status.Phase == corev1.ClaimBound
-			setCondition(nuwa, appv1.ConditionPVCReady, pvcBound,
+			setCondition(latest, appv1.ConditionPVCReady, pvcBound,
 				"PVCBound", "PVC is bound",
 				"PVCNotBound", fmt.Sprintf("PVC status: %s", pvc.Status.Phase))
 		} else if errors.IsNotFound(pvcErr) {
-			nuwa.Status.PVCStatus = "NotFound"
-			setCondition(nuwa, appv1.ConditionPVCReady, false,
+			latest.Status.PVCStatus = "NotFound"
+			setCondition(latest, appv1.ConditionPVCReady, false,
 				"", "",
 				"PVCNotFound", "PVC not found")
 		} else {
 			log.Error(pvcErr, "Failed to get PVC")
 		}
 	} else {
-		nuwa.Status.PVCStatus = ""
+		latest.Status.PVCStatus = ""
 		// Remove PVC condition if storage is not PVC type
-		removeCondition(nuwa, appv1.ConditionPVCReady)
+		removeCondition(latest, appv1.ConditionPVCReady)
 	}
 
 	// Determine phase
 	if cloneSetErr == nil {
 		if cloneSet.Status.ReadyReplicas == cloneSet.Status.Replicas && cloneSet.Status.Replicas > 0 {
-			nuwa.Status.Phase = appv1.NuwaPhaseRunning
+			latest.Status.Phase = appv1.NuwaPhaseRunning
 		} else if cloneSet.Status.Replicas == 0 {
-			nuwa.Status.Phase = appv1.NuwaPhasePending
+			latest.Status.Phase = appv1.NuwaPhasePending
 		} else {
-			nuwa.Status.Phase = appv1.NuwaPhasePending
+			latest.Status.Phase = appv1.NuwaPhasePending
 		}
 	} else {
-		nuwa.Status.Phase = appv1.NuwaPhasePending
+		latest.Status.Phase = appv1.NuwaPhasePending
 	}
 
-	return r.Status().Update(ctx, nuwa)
+	return r.Status().Update(ctx, latest)
 }
 
 // setCondition sets a condition on the Nuwa resource
