@@ -353,6 +353,47 @@ spec:
                       More info: https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/
                     type: object
                 type: object
+              resourcesOvercommit:
+                allOf:
+                - enum:
+                  - none
+                  - low
+                  - high
+                - enum:
+                  - none
+                  - low
+                  - high
+                default: none
+                description: |-
+                  ResourcesOvercommit defines the overcommit level for resources
+                  - none: requests = limits (no overcommit)
+                  - low: requests = limits / 2 (1x overcommit)
+                  - high: requests = limits / 4 (2x overcommit)
+                type: string
+              resourcesPreset:
+                allOf:
+                - enum:
+                  - none
+                  - nano
+                  - micro
+                  - small
+                  - medium
+                  - large
+                  - xlarge
+                  - xxlarge
+                - enum:
+                  - none
+                  - nano
+                  - micro
+                  - small
+                  - medium
+                  - large
+                  - xlarge
+                  - xxlarge
+                default: none
+                description: ResourcesPreset defines a preset resource configuration
+                  (ignored if Resources is set)
+                type: string
               service:
                 description: Service defines the Service configuration
                 properties:
@@ -407,8 +448,8 @@ spec:
                     description: MountPath is where to mount the volume in the container
                     type: string
                   size:
-                    description: Size is the storage size (e.g., "10Gi"), required
-                      for PVC, optional for EmptyDir
+                    description: Size is the storage size (e.g., "10Gi"), defaults
+                      to "8Gi" for PVC in controller, optional for EmptyDir
                     type: string
                   storageClassName:
                     description: StorageClassName is the storage class to use (only
@@ -424,6 +465,45 @@ spec:
                     type: string
                 required:
                 - mountPath
+                type: object
+              updateStrategy:
+                description: UpdateStrategy defines the update strategy for the CloneSet
+                properties:
+                  gracePeriodSeconds:
+                    default: 30
+                    description: GracePeriodSeconds is the grace period for in-place
+                      update
+                    format: int32
+                    type: integer
+                  maxSurge:
+                    anyOf:
+                    - type: integer
+                    - type: string
+                    description: MaxSurge is the maximum number of pods that can be
+                      scheduled above the desired number
+                    x-kubernetes-int-or-string: true
+                  maxUnavailable:
+                    anyOf:
+                    - type: integer
+                    - type: string
+                    description: MaxUnavailable is the maximum number of pods that
+                      can be unavailable during update
+                    x-kubernetes-int-or-string: true
+                  partition:
+                    default: 0
+                    description: Partition is the number of pods that should be kept
+                      at the old version
+                    format: int32
+                    type: integer
+                  type:
+                    default: InPlaceIfPossible
+                    description: 'Type is the update strategy type: InPlaceIfPossible
+                      (default), ReCreate, InPlaceOnly'
+                    enum:
+                    - InPlaceIfPossible
+                    - ReCreate
+                    - InPlaceOnly
+                    type: string
                 type: object
             required:
             - image
