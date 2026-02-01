@@ -19,6 +19,7 @@ package v1
 import (
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/util/intstr"
 )
 
 // NuwaSpec defines the desired state of Nuwa
@@ -49,6 +50,21 @@ type NuwaSpec struct {
 	// +optional
 	Resources *corev1.ResourceRequirements `json:"resources,omitempty"`
 
+	// ResourcesPreset defines a preset resource configuration (ignored if Resources is set)
+	// +kubebuilder:validation:Enum=none;nano;micro;small;medium;large;xlarge;xxlarge
+	// +kubebuilder:default=none
+	// +optional
+	ResourcesPreset ResourcesPreset `json:"resourcesPreset,omitempty"`
+
+	// ResourcesOvercommit defines the overcommit level for resources
+	// - none: requests = limits (no overcommit)
+	// - low: requests = limits / 2 (1x overcommit)
+	// - high: requests = limits / 4 (2x overcommit)
+	// +kubebuilder:validation:Enum=none;low;high
+	// +kubebuilder:default=none
+	// +optional
+	ResourcesOvercommit ResourcesOvercommit `json:"resourcesOvercommit,omitempty"`
+
 	// Command overrides the container entrypoint
 	// +optional
 	Command []string `json:"command,omitempty"`
@@ -69,7 +85,47 @@ type NuwaSpec struct {
 	// Service defines the Service configuration
 	// +optional
 	Service *ServiceSpec `json:"service,omitempty"`
+
+	// UpdateStrategy defines the update strategy for the CloneSet
+	// +optional
+	UpdateStrategy *UpdateStrategy `json:"updateStrategy,omitempty"`
 }
+
+// ResourcesPreset defines preset resource configurations
+// +kubebuilder:validation:Enum=none;nano;micro;small;medium;large;xlarge;xxlarge
+type ResourcesPreset string
+
+const (
+	// ResourcesPresetNone - no resource limits
+	ResourcesPresetNone ResourcesPreset = "none"
+	// ResourcesPresetNano - CPU: 100m, Memory: 128Mi
+	ResourcesPresetNano ResourcesPreset = "nano"
+	// ResourcesPresetMicro - CPU: 250m, Memory: 256Mi
+	ResourcesPresetMicro ResourcesPreset = "micro"
+	// ResourcesPresetSmall - CPU: 500m, Memory: 512Mi
+	ResourcesPresetSmall ResourcesPreset = "small"
+	// ResourcesPresetMedium - CPU: 1, Memory: 1Gi
+	ResourcesPresetMedium ResourcesPreset = "medium"
+	// ResourcesPresetLarge - CPU: 2, Memory: 2Gi
+	ResourcesPresetLarge ResourcesPreset = "large"
+	// ResourcesPresetXLarge - CPU: 4, Memory: 4Gi
+	ResourcesPresetXLarge ResourcesPreset = "xlarge"
+	// ResourcesPresetXXLarge - CPU: 8, Memory: 8Gi
+	ResourcesPresetXXLarge ResourcesPreset = "xxlarge"
+)
+
+// ResourcesOvercommit defines the overcommit level
+// +kubebuilder:validation:Enum=none;low;high
+type ResourcesOvercommit string
+
+const (
+	// ResourcesOvercommitNone - no overcommit, requests = limits
+	ResourcesOvercommitNone ResourcesOvercommit = "none"
+	// ResourcesOvercommitLow - 1x overcommit, requests = limits / 2
+	ResourcesOvercommitLow ResourcesOvercommit = "low"
+	// ResourcesOvercommitHigh - 2x overcommit, requests = limits / 4
+	ResourcesOvercommitHigh ResourcesOvercommit = "high"
+)
 
 // PortMapping defines a port mapping for the container and service
 type PortMapping struct {
@@ -123,6 +179,45 @@ type ServiceSpec struct {
 	ExternalTrafficPolicy corev1.ServiceExternalTrafficPolicy `json:"externalTrafficPolicy,omitempty"`
 }
 
+// UpdateStrategyType defines the type of update strategy
+// +kubebuilder:validation:Enum=InPlaceIfPossible;ReCreate;InPlaceOnly
+type UpdateStrategyType string
+
+const (
+	// InPlaceIfPossibleUpdateStrategy uses in-place update if possible, otherwise recreate
+	InPlaceIfPossibleUpdateStrategy UpdateStrategyType = "InPlaceIfPossible"
+	// ReCreateUpdateStrategy always recreates pods
+	ReCreateUpdateStrategy UpdateStrategyType = "ReCreate"
+	// InPlaceOnlyUpdateStrategy only uses in-place update, fails if not possible
+	InPlaceOnlyUpdateStrategy UpdateStrategyType = "InPlaceOnly"
+)
+
+// UpdateStrategy defines the update strategy for CloneSet
+type UpdateStrategy struct {
+	// Type is the update strategy type: InPlaceIfPossible (default), ReCreate, InPlaceOnly
+	// +kubebuilder:default=InPlaceIfPossible
+	// +optional
+	Type UpdateStrategyType `json:"type,omitempty"`
+
+	// Partition is the number of pods that should be kept at the old version
+	// +kubebuilder:default=0
+	// +optional
+	Partition *int32 `json:"partition,omitempty"`
+
+	// MaxUnavailable is the maximum number of pods that can be unavailable during update
+	// +optional
+	MaxUnavailable *intstr.IntOrString `json:"maxUnavailable,omitempty"`
+
+	// MaxSurge is the maximum number of pods that can be scheduled above the desired number
+	// +optional
+	MaxSurge *intstr.IntOrString `json:"maxSurge,omitempty"`
+
+	// GracePeriodSeconds is the grace period for in-place update
+	// +kubebuilder:default=30
+	// +optional
+	GracePeriodSeconds *int32 `json:"gracePeriodSeconds,omitempty"`
+}
+
 // StorageType defines the type of storage
 // +kubebuilder:validation:Enum=PVC;EmptyDir;HostPath
 type StorageType string
@@ -144,7 +239,7 @@ type StorageSpec struct {
 	// +kubebuilder:validation:Required
 	MountPath string `json:"mountPath"`
 
-	// Size is the storage size (e.g., "10Gi"), required for PVC, optional for EmptyDir
+	// Size is the storage size (e.g., "10Gi"), defaults to "8Gi" for PVC in controller, optional for EmptyDir
 	// +optional
 	Size string `json:"size,omitempty"`
 

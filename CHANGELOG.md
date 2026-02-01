@@ -7,6 +7,62 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2026-02-01]
+
+### Added
+- 资源预设配置功能（ResourcesPreset）
+  - 支持 8 种预设规格：none/nano/micro/small/medium/large/xlarge/xxlarge
+  - 自动计算 CPU 和内存资源限制
+- 资源超卖配置（ResourcesOvercommit）
+  - 支持 3 种超卖级别：none/low/high
+  - 自动计算 requests 与 limits 的比例
+- 更新策略配置（UpdateStrategy）
+  - 支持 3 种更新类型：InPlaceIfPossible/ReCreate/InPlaceOnly
+  - 支持灰度发布参数：partition/maxUnavailable/maxSurge/gracePeriodSeconds
+- 完整的单元测试覆盖
+  - `buildUpdateStrategy` 函数测试（9 个测试用例）
+  - `getResourcesFromPreset` 函数测试（18 个测试用例）
+  - 覆盖所有 preset 类型和 overcommit 级别
+- 详细的配置文档
+  - `docs/resources-configuration.md`：资源配置指南
+  - `docs/storage-configuration.md`：存储配置指南
+
+### Changed
+- **重要**：PVC 存储实现方式变更
+  - 从 CloneSet volumeClaimTemplates 改为独立创建 PVC
+  - 所有副本共享同一个 PVC（`<nuwa-name>-data`）
+  - PVC 生命周期独立于 Pod，只随 Nuwa 资源删除
+- 资源配置默认值策略
+  - `resourcesPreset` 默认为 `none`（向后兼容，不影响现有 CR）
+  - `resourcesOvercommit` 默认为 `none`（无超卖）
+  - 用户需显式设置才会应用资源限制
+- CI workflow 优化
+  - E2E 测试使用 `latest` 标签而非 SHA 标签
+  - 简化 Docker 镜像标签策略
+- 代码质量改进
+  - 提取 `buildLabels()` 辅助函数，消除重复代码
+  - 提取 `getPVCName()` 辅助函数，统一 PVC 命名
+  - 将 `presetLimits` 提取为包级别常量，提升性能
+
+### Fixed
+- **关键**：PVC 创建顺序错误
+  - PVC 现在在 CloneSet 之前创建，避免 Pod Pending
+- **关键**：存储大小格式验证
+  - 添加 `resource.ParseQuantity` 验证，避免 `MustParse` panic
+  - `buildPVC` 函数返回 error，提升控制器健壮性
+- **关键**：添加 PVC Owns 声明
+  - 在 `SetupWithManager` 中声明 PVC 所有权
+  - 确保 PVC 变更时触发 reconcile
+- 资源计算精度问题
+  - 使用 `SetMilli(MilliValue() / divisor)` 替代 `Set(Value() / divisor)`
+  - 修复亚核心值（100m, 250m, 500m）的 CPU requests 计算错误
+- EmptyDir 默认大小问题
+  - 移除 CRD 中 Storage.Size 的默认值
+  - 只对 PVC 类型在控制器中应用默认 8Gi
+- 测试单位错误
+  - 修正内存测试中 `MilliValue()` 为 `Value()`
+  - 正确比较字节数而非毫字节数
+
 ## [2026-01-31]
 
 ### Added

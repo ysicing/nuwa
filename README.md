@@ -134,7 +134,23 @@ spec:
   # 私有镜像仓库凭证
   imagePullSecrets:
     - name: registry-secret
+
+  # 更新策略（基于 OpenKruise CloneSet）
+  updateStrategy:
+    type: InPlaceIfPossible   # InPlaceIfPossible（默认）、ReCreate、InPlaceOnly
+    partition: 0              # 保留旧版本的 Pod 数量
+    maxUnavailable: 1         # 更新时最大不可用数
+    maxSurge: 0               # 更新时最大额外 Pod 数
+    gracePeriodSeconds: 30    # 原地升级优雅期限
 ```
+
+### 更新策略
+
+| 类型 | 说明 |
+|------|------|
+| `InPlaceIfPossible` | 原地升级（默认），只更新容器镜像，不重建 Pod |
+| `ReCreate` | 重建升级，删除旧 Pod 后创建新 Pod |
+| `InPlaceOnly` | 仅原地升级，不支持时会失败 |
 
 ### 存储类型
 
