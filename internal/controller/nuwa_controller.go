@@ -415,7 +415,8 @@ func hasNuwaOwnerReference(pvc *corev1.PersistentVolumeClaim, nuwa *appv1.Nuwa) 
 func removeNuwaOwnerReference(pvc *corev1.PersistentVolumeClaim, nuwa *appv1.Nuwa) {
 	var newRefs []metav1.OwnerReference
 	for _, ref := range pvc.OwnerReferences {
-		if !(ref.Kind == "Nuwa" && ref.Name == nuwa.Name) {
+		// Keep references that are not from this Nuwa (De Morgan's law applied)
+		if ref.Kind != "Nuwa" || ref.Name != nuwa.Name {
 			newRefs = append(newRefs, ref)
 		}
 	}
