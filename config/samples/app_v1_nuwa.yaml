@@ -23,10 +23,15 @@ spec:
       containerPort: 80
       servicePort: 80
 
-  # Service type: ClusterIP, NodePort, LoadBalancer
-  serviceType: ClusterIP
+  # Service configuration (optional)
+  service:
+    type: ClusterIP  # ClusterIP, NodePort, LoadBalancer
 
-  # Resource limits (optional)
+  # Resource presets (optional, defaults to none)
+  # resourcesPreset: small  # none, nano, micro, small, medium, large, xlarge, xxlarge
+  # resourcesOvercommit: low  # none, low, high
+
+  # Or use explicit resource limits (takes priority over presets)
   # resources:
   #   requests:
   #     cpu: 100m

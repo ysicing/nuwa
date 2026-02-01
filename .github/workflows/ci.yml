@@ -4,8 +4,12 @@ on:
   push:
     branches: [master, main]
     tags: ['v*']
+    paths-ignore:
+      - 'dist/install.yaml'
   pull_request:
     branches: [master, main]
+    paths-ignore:
+      - 'dist/install.yaml'
 
 env:
   GO_VERSION: '1.25'
@@ -98,6 +102,50 @@ jobs:
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
 
+      - name: Build installer manifest
+        if: github.event_name == 'push'
+        run: make build-installer IMG=${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest
+
+      - name: Upload installer manifest
+        if: github.event_name == 'push'
+        uses: actions/upload-artifact@v4
+        with:
+          name: install-yaml
+          path: dist/install.yaml
+          retention-days: 7
+
+  update-installer:
+    name: Update Installer
+    runs-on: ubuntu-latest
+    needs: [build]
+    if: github.event_name == 'push' && github.ref == 'refs/heads/master'
+    permissions:
+      contents: write
+      pull-requests: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Download installer manifest
+        uses: actions/download-artifact@v4
+        with:
+          name: install-yaml
+          path: dist/
+
+      - name: Create Pull Request
+        uses: peter-evans/create-pull-request@v7
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          commit-message: 'chore: update install.yaml'
+          title: 'chore: update install.yaml'
+          body: |
+            Auto-generated installer manifest update.
+
+            This PR was automatically created by the CI workflow.
+          branch: chore/update-install-yaml
+          delete-branch: true
+          labels: automated
+          add-paths: dist/install.yaml
+
   e2e:
     name: E2E Test
     runs-on: ubuntu-latest
@@ -105,6 +153,12 @@ jobs:
     if: github.event_name == 'push'
     steps:
       - uses: actions/checkout@v4
+
+      - name: Download installer manifest
+        uses: actions/download-artifact@v4
+        with:
+          name: install-yaml
+          path: dist/
 
       - name: Create Kind cluster
         uses: helm/kind-action@v1
@@ -118,7 +172,6 @@ jobs:
 
       - name: Deploy Nuwa
         run: |
-          make build-installer IMG=${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest
           kubectl apply -f dist/install.yaml
           kubectl -n nuwa-system wait --for=condition=available deployment/nuwa-controller-manager --timeout=120s
 
