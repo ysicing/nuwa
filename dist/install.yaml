@@ -447,6 +447,14 @@ spec:
                   mountPath:
                     description: MountPath is where to mount the volume in the container
                     type: string
+                  retainPolicy:
+                    default: Retain
+                    description: RetainPolicy defines whether PVC should be retained
+                      when Nuwa is deleted (only for PVC)
+                    enum:
+                    - Retain
+                    - Delete
+                    type: string
                   size:
                     description: Size is the storage size (e.g., "10Gi"), defaults
                       to "8Gi" for PVC in controller, optional for EmptyDir
